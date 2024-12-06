@@ -1,28 +1,25 @@
 # Import the dependencies.
 import numpy as np
 import sqlalchemy
+import pandas as pd
+
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session
 from flask import Flask, jsonify
 
 #database setup
-database_path = "../Resources/hawaii.sqlite"
-engine = create_engine(f"sqlite:///{database_path}")
-
 
 #################################################
 # Database Setup
 #################################################
 database_path = "../Resources/hawaii.sqlite"
-engine = create_engine(f"sqlite:///{database_path}")
+engine = create_engine("sqlite:///hawaii.sqlite",pool_pre_ping=True)
 
 # reflect an existing database into a new model
-Base = automap_base()
 #reflect the tables
+Base = automap_base()
 Base.prepare(autoload_with=engine)
-# reflect the tables
-
 
 # Save references to each table
 
@@ -52,14 +49,30 @@ def welcome():
         f"/api/v1.0/<start><br/>"
         f"/api/v1.0/<start>/<end><br/>"
     )
-    #create a dictionary of the active stations and their counts
-    station_data = []
-    for station in results:
-        station_dict = {}
-        station_dict["station name"] = station[0]
-        station_data.append(station_dict)
+#create a dictionary of the active stations and their counts
+@app.route("/api/v1.0/stations")
+def stations():
+        session = Session(engine)
+        station_data = []
+        active_stations = session.query(Measurement.station, func.count(Measurement.station)).group_by(Measurement.station).order_by(func.count(Measurement.station).desc()).all()
+        active_stations
+        for station in active_stations:
+            station_dict = {}
+            station_dict["station name"] = station[0]
+            station_data.append(station_dict)
 
-    return jsonify(station_data)
+        return jsonify(station_data)
+
+@app.route("/api/v1.0/precipitation")
+def precipitation():
+        session = Session(engine)
+        prep_data = []
+        cutoff_date = '2016-08-23'
+        # Calculate the date one year from the last date in data set.
+        prcp = session.query(Measurement.date, Measurement.prcp).filter(Measurement.date > cutoff_date).all()
+        prcp_df = pd.DataFrame(prcp)
+
+        return jsonify(prcp_df.to_dict(orient="records"))
 
 #app routing for t_observed for the past 12 months
 @app.route("/api/v1.0/tobs")
